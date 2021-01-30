@@ -7,6 +7,12 @@ import game_stats
 #pylint: skip-file
 
 def random_roll(chips_list, hypo_completed):
+    """
+    Simulates a random roll. Takes into consideration what the current chips list is and what the "hypothesized" completed
+    chips are. Thus, this function will only return rolls that are actually pickable.
+
+    Returns: rolls, boolean that determines whether to split the numbers (e.g. pick 6 OR 8)
+    """
     tmp_rolls = [random.randint(1, 6) + random.randint(1, 6), random.randint(1, 6) + random.randint(1, 6)]
     rolls = []
     for i in range(2):
@@ -38,24 +44,26 @@ def random_roll(chips_list, hypo_completed):
             else:
                 return [], False
 
-def player_move(chips_list, player_A, player_B, hypo_A, hypo_B, completed, hypo_completed, board_end, PLAYER_MOVE, RANDOM=True):
+def player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MOVE, RANDOM=True):
+    """
+    Simulates a player's move, where they are presented with the three rolls. If RANDOM is set to true, then this code randomly
+    chooses a number to pick from the possible choices.
+
+    Returns: Updated chips list, updated completed list, "True" which means the roll FAILED/didn't go through and the player's progress is gone
+    """
+
     rolls_list = []
     for i in range(3):
         rolls, is_split = random_roll(chips_list, hypo_completed)
+
         if is_split:
             for roll in rolls:
                 rolls_list.append([roll])
         elif rolls:
             rolls_list.append(rolls)
-    #print(rolls_list)
 
     if not rolls_list:
-        if PLAYER_MOVE:
-            hypo_A = player_A.copy()
-        else:
-            hypo_B = player_B.copy()
-        hypo_completed = completed.copy()
-        return set(), hypo_completed, True
+        return chips_list, hypo_completed, True
 
     if RANDOM:
         index = random.randint(0, len(rolls_list)-1)
@@ -73,6 +81,10 @@ def player_move(chips_list, player_A, player_B, hypo_A, hypo_B, completed, hypo_
         return chips_list, hypo_completed, False
             
 def continue_turn(RANDOM=True, RIG=0.5):
+    """
+    Randomly determines if the player's turn continues
+    """
+
     if RANDOM:
         is_cont = random.random()
         if is_cont <= RIG:
@@ -80,20 +92,41 @@ def continue_turn(RANDOM=True, RIG=0.5):
         else:
             return False
 
-def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE):
-    # monte carlo simulation
+def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE):
+    """
+    Driver Monte Carlo Simulation
+
+    Returns: Result, total fails, total ends
+    """
+    total_fails = 0
+    total_ends = 0
 
     while True:
-        chips_list, hypo_completed, is_cont = player_move(chips_list, player_A, player_B, hypo_A, hypo_B, completed, hypo_completed, board_end, PLAYER_MOVE)
-        if is_cont:
+        chips_list, hypo_completed, failed = player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MOVE)
+        if failed:
+            total_fails += 1
+            # Reset all parameters
+            if PLAYER_MOVE:
+                hypo_A = player_A.copy()
+                if total_fails == 1:
+                    player_A_score = A_score_org
+            else:
+                hypo_B = player_B.copy()
+                if total_fails == 1:
+                    player_B_score = B_score_org
+            hypo_completed = completed.copy()
+            chips_list = set()
             PLAYER_MOVE = (1-PLAYER_MOVE)
             continue
-
+        
         if len(chips_list) < 3:
+            # You should never end before using all three chips
             continue
 
-        is_cont = continue_turn(RIG=0.8)
+        is_cont = continue_turn(RIG=0.8) # Potentially have RIG higher since you don't really want to end too early typically
         if not is_cont:
+            total_ends += 1
+            # Copy all parameters over
             if PLAYER_MOVE:
                 player_A = hypo_A.copy()
             else:
@@ -110,17 +143,11 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
             PLAYER_MOVE = (1-PLAYER_MOVE)
 
             if player_A_score >= 3:
-                return 1, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE
+                return 1, total_fails, total_ends
             elif player_B_score >= 3:
-                return 0, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE
+                return 0, total_fails, total_ends
 
-def play(ITERATIONS):
-    # Input -1 for impossible moves
-    a1, a2 = [int(x) for x in input("Top Dice: ").split()]
-    b1, b2 = [int(x) for x in input("Middle Dice: ").split()]
-    c1, c2 = [int(x) for x in input("Last Dice: ").split()]
-    possible_moves = [[a1, a2], [b1, b2], [c1, c2]]
-
+def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
     # Original parameters - is changed every play + continuation
     player_A_org = game_stats.player_A.copy()
     player_B_org = game_stats.player_B.copy()
@@ -128,13 +155,63 @@ def play(ITERATIONS):
     hypo_B_org = game_stats.hypo_B.copy()
     player_A_score_org = game_stats.player_A_score
     player_B_score_org = game_stats.player_B_score
+    hypo_A_score_org = game_stats.player_A_score
+    hypo_B_score_org = game_stats.player_B_score
     completed_org = game_stats.completed.copy()
     hypo_completed_org = game_stats.hypo_completed.copy()
     PLAYER_MOVE_org = game_stats.PLAYER_MOVE
-    board_end = {k: 2*(7-abs(7-k))-1 for k in range(2, 13)}
     chips_list_org = set()
+    board_end = {k: 2*(7-abs(7-k))-1 for k in range(2, 13)}
 
     while True:
+        # Input -1 for impossible moves
+        a1, a2 = [int(x) for x in input("Top Dice: ").split()]
+        b1, b2 = [int(x) for x in input("Middle Dice: ").split()]
+        c1, c2 = [int(x) for x in input("Last Dice: ").split()]
+        possible_moves = [[a1, a2], [b1, b2], [c1, c2]]
+        if not PRODUCTION:
+            # Pre split
+            possible_moves_tmp = []
+            go = True
+            for i in range(len(possible_moves)):
+                rolls = []
+                for move in possible_moves[i]:
+                    if move not in hypo_completed_org:
+                        rolls.append(move)
+
+                n = len(chips_list_org)
+                if not rolls:
+                    continue
+                elif len(rolls) == 1:
+                    if n == 3:
+                        if rolls[0] in chips_list_org:
+                            possible_moves_tmp.append(rolls)  
+                        else:
+                            continue
+                    else:
+                        possible_moves_tmp.append(rolls)
+                else:
+                    if n <= 1:
+                        possible_moves_tmp.append(rolls)
+                    elif n == 2:
+                        if rolls[0] in chips_list_org or rolls[1] in chips_list_org:
+                            possible_moves_tmp.append(rolls)
+                        else:
+                            for roll in rolls:
+                                possible_moves_tmp.append([roll])
+                    elif n == 3:
+                        if rolls[0] in chips_list_org and rolls[1] in chips_list_org:
+                            possible_moves_tmp.append(rolls)
+                        else:
+                            continue
+                go = False
+                
+            if go:
+                print("No moves are possible.")
+                return
+
+            possible_moves = possible_moves_tmp
+        
         win_percentage = []
         for i in range(len(possible_moves)):
             # Current move copy of original version - Iterated over 3 times
@@ -144,10 +221,13 @@ def play(ITERATIONS):
             hypo_B_now = hypo_B_org.copy()
             player_A_score_now = player_A_score_org
             player_B_score_now = player_B_score_org
+            hypo_A_score_now = hypo_A_score_org
+            hypo_B_score_now = hypo_B_score_org
             completed_now = completed_org.copy()
             hypo_completed_now = hypo_completed_org.copy()
             PLAYER_MOVE_now = PLAYER_MOVE_org
             chips_list_now = chips_list_org.copy()
+
             for move in possible_moves[i]:
                 if move == -1:
                     continue
@@ -158,63 +238,142 @@ def play(ITERATIONS):
                     if player_A_now[move] >= board_end[move]:
                         hypo_completed_now.add(move)
                         player_A_score_now += 1
+                        if player_A_score_now >= 3:
+                            print("Player A wins.")
+                            return
                 else:
                     player_B_now[move] += 1
                     if player_B_now[move] >= board_end[move]:
                         hypo_completed_now.add(move)
                         player_B_score_now += 1
+                        if player_B_score_now >= 3:
+                            print("Player B wins.")
+                            return
             
             result_list = [0, 0]
+            other_info = [0, 0]
             for j in range(ITERATIONS):
                 # Copy of each turn's version
                 player_A = player_A_now.copy()
                 player_B = player_B_now.copy()
                 hypo_A = hypo_A_now.copy()
                 hypo_B = hypo_B_now.copy()
-                player_A_score = player_A_score_now
-                player_B_score = player_B_score_now
+                A_score_org = player_A_score_now
+                B_score_org = player_B_score_now
+                player_A_score = hypo_A_score_now # local storage
+                player_B_score = hypo_B_score_now
                 completed = completed_now.copy()
                 hypo_completed = hypo_completed_now.copy()
                 PLAYER_MOVE = PLAYER_MOVE_now
                 chips_list = chips_list_now.copy()
-                result, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE = run(chips_list, 
-                            player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE)
+                
+                result, total_fails, total_ends = run(chips_list, 
+                            player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
+                
                 result_list[result] += 1
+                other_info[0] += total_fails
+                other_info[1] += total_ends
 
             if PLAYER_MOVE_now:
                 win_percentage.append([result_list[1], i])
             else:
                 win_percentage.append([result_list[0], i])
             
-            print(f"Player A won {result_list[1]} times, Player B won {result_list[0]} times")
-        
+            if len(possible_moves[i]) == 1:
+                print(f"For roll {possible_moves[i][0]}, Player A won {result_list[1]} times, Player B won {result_list[0]} times. There was an average of {other_info[0]/ITERATIONS} fails and {other_info[1]/ITERATIONS} ends.")
+            else:
+                print(f"For roll {possible_moves[i][0]} and {possible_moves[i][1]}, Player A won {result_list[1]} times, Player B won {result_list[0]} times. There was an average of {other_info[0]/ITERATIONS} fails and {other_info[1]/ITERATIONS} ends.")
+
         win_percentage.sort(reverse=True)
+        print(f"The player should pick Dice number {win_percentage[0][1]+1}, which has the roll(s) {possible_moves[win_percentage[0][1]]}")
+
+        # Determine if we should end
+        result_list = [0, 0]
+        win_percentage_cont = []
+        for j in range(ITERATIONS):
+            # end
+            player_A = hypo_A_org.copy()
+            player_B = hypo_B_org.copy()
+            hypo_A = hypo_A_org.copy()
+            hypo_B = hypo_B_org.copy()
+            A_score_org = hypo_A_score_org
+            B_score_org = hypo_B_score_org
+            player_A_score = hypo_A_score_org
+            player_B_score = hypo_B_score_org
+            completed = hypo_completed_org.copy()
+            hypo_completed = hypo_completed_org.copy()
+            PLAYER_MOVE = (1-PLAYER_MOVE_org)
+            chips_list = set()
+
+            result, total_fails, total_ends = run(chips_list, 
+                            player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
+            
+            result_list[result] += 1
+
+        if PLAYER_MOVE_org:
+            win_percentage_cont.append(result_list[1])
+        else:
+            win_percentage_cont.append(result_list[0])
+        
+        print(f"If the turn ends, then Player A won {result_list[1]} times, Player B won {result_list[0]} times.")
         
         # Make the move that leads to the highest win percentage
         for move in possible_moves[win_percentage[0][1]]:
             chips_list_org.add(move)
             if PLAYER_MOVE_org:
-                player_A_org[move] += 1
+                hypo_A_org[move] += 1
                 if player_A_org[move] >= board_end[move]:
                     hypo_completed_org.add(move)
-                    player_A_score_org += 1
+                    hypo_A_score_org += 1
             else:
-                player_B_org[move] += 1
+                hypo_B_org[move] += 1
                 if player_B_org[move] >= board_end[move]:
                     hypo_completed_org.add(move)
-                    player_B_score_org += 1
+                    hypo_B_score_org += 1
 
         result_list = [0, 0]
-        # Simulate whether to continue
         for j in range(ITERATIONS):
-            # continue
-            result, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE = run(chips_list, 
-                    player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE)
+            player_A = player_A_org.copy()
+            player_B = player_B_org.copy()
+            hypo_A = hypo_A_org.copy()
+            hypo_B = hypo_B_org.copy()
+            A_score_org = player_A_score_org
+            B_score_org = player_B_score_org
+            player_A_score = hypo_A_score_org
+            player_B_score = hypo_B_score_org
+            completed = completed_org.copy()
+            hypo_completed = hypo_completed_org.copy()
+            chips_list = chips_list_org.copy()
+            result, total_fails, total_ends = run(chips_list, 
+                        player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
 
-        for j in range(ITERATIONS):
-            # end
-            PLAYER_MOVE = (1-PLAYER_MOVE_org)
-            result, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE = run(chips_list, 
-                    player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, completed, hypo_completed, board_end, PLAYER_MOVE)
+            result_list[result] += 1
+
+        if PLAYER_MOVE_org:
+            win_percentage_cont.append(result_list[1])
+        else:
+            win_percentage_cont.append(result_list[0])
+        
+        print(f"If the turn continues, then Player A won {result_list[1]} times, Player B won {result_list[0]} times.")
+
+        if win_percentage_cont[1] >= win_percentage_cont[0] or len(chips_list_org) < 3:
+            print("The player should continue the game... waiting for input now...")
+            with open('game.txt', 'w') as f:
+                if PLAYER_MOVE_org:
+                    f.write(f"hypo_A: {hypo_A_org}\nplayer_A_score: {hypo_A_score_org}\n")
+                else:
+                    f.write(f"hypo_B: {hypo_B_org}\nplayer_B_score: {hypo_B_score_org}\n")
+                
+                f.write(f"completed: {hypo_completed_org}\nchips_list: {chips_list_org}")
+        else:
+            print("The computer suggests you should end your turn. Will you continue? Type yes/no.")
+            while True:
+                is_cont = str(input("Continue: "))
+                if is_cont.lower() == "yes":
+                    break
+                elif is_cont.lower() == "no":
+                    return
+                else:
+                    print("Try to input again...")
             
-play(10000)
+play(1600, PRINT_STATS=True)

@@ -1,0 +1,4 @@
+hypo_B: {2: 0, 3: 0, 4: 0, 5: 0, 6: 1, 7: 5, 8: 0, 9: 0, 10: 0, 11: 1, 12: 0}
+player_B_score: 0
+completed: set()
+chips_list: {11, 6}

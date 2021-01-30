@@ -1,0 +1,9 @@
+player_A = {2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0, 11:0, 12:0}
+player_B = {2:0, 3:0, 4:0, 5:0, 6:0, 7:5, 8:0, 9:0, 10:0, 11:0, 12:0}
+hypo_A = player_A.copy()
+hypo_B = player_B.copy()
+player_A_score = 0
+player_B_score = 0
+completed = set()
+hypo_completed = completed.copy()
+PLAYER_MOVE = 0 # Starts with A

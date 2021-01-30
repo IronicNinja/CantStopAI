@@ -34,7 +34,7 @@ def random_roll(chips_list, hypo_completed):
         if n <= 1:
             return rolls, False
         elif n == 2:
-            if rolls[0] in chips_list or rolls[1] in chips_list:
+            if rolls[0] in chips_list or rolls[1] in chips_list or rolls[0] == rolls[1]:
                 return rolls, False
             else:
                 return rolls, True
@@ -108,11 +108,11 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
             # Reset all parameters
             if PLAYER_MOVE:
                 hypo_A = player_A.copy()
-                if total_fails == 1:
+                if total_fails == 1 and total_ends == 0:
                     player_A_score = A_score_org
             else:
                 hypo_B = player_B.copy()
-                if total_fails == 1:
+                if total_fails == 1 and total_ends == 0:
                     player_B_score = B_score_org
             hypo_completed = completed.copy()
             chips_list = set()
@@ -123,7 +123,7 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
             # You should never end before using all three chips
             continue
 
-        is_cont = continue_turn(RIG=0.8) # Potentially have RIG higher since you don't really want to end too early typically
+        is_cont = continue_turn(RIG=0.5) # Potentially have RIG higher since you don't really want to end too early typically
         if not is_cont:
             total_ends += 1
             # Copy all parameters over
@@ -147,7 +147,7 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
             elif player_B_score >= 3:
                 return 0, total_fails, total_ends
 
-def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
+def play(ITERATIONS, PRINT_STATS=False):
     # Original parameters - is changed every play + continuation
     player_A_org = game_stats.player_A.copy()
     player_B_org = game_stats.player_B.copy()
@@ -169,48 +169,47 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
         b1, b2 = [int(x) for x in input("Middle Dice: ").split()]
         c1, c2 = [int(x) for x in input("Last Dice: ").split()]
         possible_moves = [[a1, a2], [b1, b2], [c1, c2]]
-        if not PRODUCTION:
-            # Pre split
-            possible_moves_tmp = []
-            go = True
-            for i in range(len(possible_moves)):
-                rolls = []
-                for move in possible_moves[i]:
-                    if move not in hypo_completed_org:
-                        rolls.append(move)
+        # Pre split
+        possible_moves_tmp = []
+        go = True
+        for i in range(len(possible_moves)):
+            rolls = []
+            for move in possible_moves[i]:
+                if move not in hypo_completed_org and move != -1:
+                    rolls.append(move)
 
-                n = len(chips_list_org)
-                if not rolls:
-                    continue
-                elif len(rolls) == 1:
-                    if n == 3:
-                        if rolls[0] in chips_list_org:
-                            possible_moves_tmp.append(rolls)  
-                        else:
-                            continue
+            n = len(chips_list_org)
+            if not rolls:
+                continue
+            elif len(rolls) == 1:
+                if n == 3:
+                    if rolls[0] in chips_list_org:
+                        possible_moves_tmp.append(rolls)  
                     else:
-                        possible_moves_tmp.append(rolls)
+                        continue
                 else:
-                    if n <= 1:
+                    possible_moves_tmp.append(rolls)
+            else:
+                if n <= 1:
+                    possible_moves_tmp.append(rolls)
+                elif n == 2:
+                    if rolls[0] in chips_list_org or rolls[1] in chips_list_org or rolls[0] == rolls[1]:
                         possible_moves_tmp.append(rolls)
-                    elif n == 2:
-                        if rolls[0] in chips_list_org or rolls[1] in chips_list_org:
-                            possible_moves_tmp.append(rolls)
-                        else:
-                            for roll in rolls:
-                                possible_moves_tmp.append([roll])
-                    elif n == 3:
-                        if rolls[0] in chips_list_org and rolls[1] in chips_list_org:
-                            possible_moves_tmp.append(rolls)
-                        else:
-                            continue
-                go = False
+                    else:
+                        for roll in rolls:
+                            possible_moves_tmp.append([roll])
+                elif n == 3:
+                    if rolls[0] in chips_list_org and rolls[1] in chips_list_org:
+                        possible_moves_tmp.append(rolls)
+                    else:
+                        continue
+            go = False
                 
-            if go:
-                print("No moves are possible.")
-                return
+        if go:
+            print("No moves are possible.")
+            return
 
-            possible_moves = possible_moves_tmp
+        possible_moves = possible_moves_tmp
         
         win_percentage = []
         for i in range(len(possible_moves)):
@@ -229,26 +228,17 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
             chips_list_now = chips_list_org.copy()
 
             for move in possible_moves[i]:
-                if move == -1:
-                    continue
-                    
                 chips_list_now.add(move)
                 if PLAYER_MOVE_now:
                     player_A_now[move] += 1
                     if player_A_now[move] >= board_end[move]:
                         hypo_completed_now.add(move)
-                        player_A_score_now += 1
-                        if player_A_score_now >= 3:
-                            print("Player A wins.")
-                            return
+                        hypo_A_score_now += 1
                 else:
                     player_B_now[move] += 1
                     if player_B_now[move] >= board_end[move]:
                         hypo_completed_now.add(move)
-                        player_B_score_now += 1
-                        if player_B_score_now >= 3:
-                            print("Player B wins.")
-                            return
+                        hypo_B_score_now += 1
             
             result_list = [0, 0]
             other_info = [0, 0]
@@ -286,6 +276,25 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
 
         win_percentage.sort(reverse=True)
         print(f"The player should pick Dice number {win_percentage[0][1]+1}, which has the roll(s) {possible_moves[win_percentage[0][1]]}")
+        # Make the move that leads to the highest win percentage
+        for move in possible_moves[win_percentage[0][1]]:
+            chips_list_org.add(move)
+            if PLAYER_MOVE_org:
+                hypo_A_org[move] += 1
+                if hypo_A_org[move] >= board_end[move]:
+                    hypo_completed_org.add(move)
+                    hypo_A_score_org += 1
+                    if hypo_A_score_org >= 3:
+                        print("Player A wins.")
+                        return
+            else:
+                hypo_B_org[move] += 1
+                if hypo_B_org[move] >= board_end[move]:
+                    hypo_completed_org.add(move)
+                    hypo_B_score_org += 1
+                    if hypo_B_score_org >= 3:
+                        print("Player B wins.")
+                        return
 
         # Determine if we should end
         result_list = [0, 0]
@@ -316,23 +325,11 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
             win_percentage_cont.append(result_list[0])
         
         print(f"If the turn ends, then Player A won {result_list[1]} times, Player B won {result_list[0]} times.")
-        
-        # Make the move that leads to the highest win percentage
-        for move in possible_moves[win_percentage[0][1]]:
-            chips_list_org.add(move)
-            if PLAYER_MOVE_org:
-                hypo_A_org[move] += 1
-                if player_A_org[move] >= board_end[move]:
-                    hypo_completed_org.add(move)
-                    hypo_A_score_org += 1
-            else:
-                hypo_B_org[move] += 1
-                if player_B_org[move] >= board_end[move]:
-                    hypo_completed_org.add(move)
-                    hypo_B_score_org += 1
 
         result_list = [0, 0]
+
         for j in range(ITERATIONS):
+            # continue
             player_A = player_A_org.copy()
             player_B = player_B_org.copy()
             hypo_A = hypo_A_org.copy()
@@ -343,10 +340,12 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
             player_B_score = hypo_B_score_org
             completed = completed_org.copy()
             hypo_completed = hypo_completed_org.copy()
+            PLAYER_MOVE = PLAYER_MOVE_org
             chips_list = chips_list_org.copy()
+
             result, total_fails, total_ends = run(chips_list, 
                         player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
-
+            
             result_list[result] += 1
 
         if PLAYER_MOVE_org:
@@ -356,15 +355,16 @@ def play(ITERATIONS, PRODUCTION=False, PRINT_STATS=False):
         
         print(f"If the turn continues, then Player A won {result_list[1]} times, Player B won {result_list[0]} times.")
 
+        with open('game.txt', 'w') as f:
+            if PLAYER_MOVE_org:
+                f.write(f"player_A = {hypo_A_org}\nplayer_A_score = {hypo_A_score_org}\n")
+            else:
+                f.write(f"player_B = {hypo_B_org}\nplayer_B_score = {hypo_B_score_org}\n")
+                    
+            f.write(f"completed = {hypo_completed_org}\nchips_list = {chips_list_org}")
+
         if win_percentage_cont[1] >= win_percentage_cont[0] or len(chips_list_org) < 3:
             print("The player should continue the game... waiting for input now...")
-            with open('game.txt', 'w') as f:
-                if PLAYER_MOVE_org:
-                    f.write(f"hypo_A: {hypo_A_org}\nplayer_A_score: {hypo_A_score_org}\n")
-                else:
-                    f.write(f"hypo_B: {hypo_B_org}\nplayer_B_score: {hypo_B_score_org}\n")
-                
-                f.write(f"completed: {hypo_completed_org}\nchips_list: {chips_list_org}")
         else:
             print("The computer suggests you should end your turn. Will you continue? Type yes/no.")
             while True:

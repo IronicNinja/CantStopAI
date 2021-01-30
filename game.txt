@@ -1,4 +1,4 @@
-hypo_B: {2: 0, 3: 0, 4: 0, 5: 0, 6: 1, 7: 5, 8: 0, 9: 0, 10: 0, 11: 1, 12: 0}
-player_B_score: 0
-completed: set()
-chips_list: {11, 6}
+player_A = {2: 2, 3: 5, 4: 4, 5: 9, 6: 4, 7: 11, 8: 8, 9: 2, 10: 6, 11: 3, 12: 0}
+player_A_score = 2
+completed = {3, 5}
+chips_list = {4}

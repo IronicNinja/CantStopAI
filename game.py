@@ -6,6 +6,12 @@ import game_stats
 
 #pylint: skip-file
 
+def prob_on_next(x):
+    """
+    probability that some number will be rolled on the next move
+    """
+    return 1-pow(1-((6-abs(7-x))/36), 6)
+
 def random_roll(chips_list, hypo_completed):
     """
     Simulates a random roll. Takes into consideration what the current chips list is and what the "hypothesized" completed
@@ -41,6 +47,10 @@ def random_roll(chips_list, hypo_completed):
         elif n == 3:
             if rolls[0] in chips_list and rolls[1] in chips_list:
                 return rolls, False
+            elif rolls[0] in chips_list:
+                return [rolls[0]], False
+            elif rolls[1] in chips_list:
+                return [rolls[1]], False
             else:
                 return [], False
 
@@ -92,14 +102,16 @@ def continue_turn(RANDOM=True, RIG=0.5):
         else:
             return False
 
-def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE):
+def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE):
     """
     Driver Monte Carlo Simulation
+    RIG_TYPE -> RANDOM: complete random simulations; EXP: x, x^2, x^3...; SQRT: x*sqrt(k), x*sqrt(k+1)...
 
     Returns: Result, total fails, total ends
     """
     total_fails = 0
     total_ends = 0
+    curr_success = 0
 
     while True:
         chips_list, hypo_completed, failed = player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MOVE)
@@ -117,13 +129,29 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
             hypo_completed = completed.copy()
             chips_list = set()
             PLAYER_MOVE = (1-PLAYER_MOVE)
+            curr_success = 0
             continue
         
         if len(chips_list) < 3:
             # You should never end before using all three chips
             continue
+        
+        RIG = 1
+        curr_success += 1
 
-        is_cont = continue_turn(RIG=0.5) # Potentially have RIG higher since you don't really want to end too early typically
+        if RIG_TYPE.lower() == "random":
+            RIG = 0.5
+        elif RIG_TYPE.lower() == "sqrt" or RIG_TYPE.lower() == "exp":
+            for chip in chips_list:
+                RIG *= (1-prob_on_next(chip))
+
+            if RIG_TYPE.lower() == "sqrt":
+                RIG = (1-RIG)/math.sqrt(curr_success)
+            elif RIG_TYPE.lower() == "exp":
+                RIG = pow((1-RIG), curr_success)
+
+        is_cont = continue_turn(RIG=RIG) # Potentially have RIG higher since you don't really want to end too early typically
+
         if not is_cont:
             total_ends += 1
             # Copy all parameters over
@@ -141,13 +169,14 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
 
             completed = hypo_completed.copy()
             PLAYER_MOVE = (1-PLAYER_MOVE)
+            curr_success = 0
 
             if player_A_score >= 3:
                 return 1, total_fails, total_ends
             elif player_B_score >= 3:
                 return 0, total_fails, total_ends
 
-def play(ITERATIONS, PRINT_STATS=False):
+def play(ITERATIONS, PRINT_STATS=False, th=0.8, RIG_TYPE="EXP"):
     # Original parameters - is changed every play + continuation
     player_A_org = game_stats.player_A.copy()
     player_B_org = game_stats.player_B.copy()
@@ -201,6 +230,10 @@ def play(ITERATIONS, PRINT_STATS=False):
                 elif n == 3:
                     if rolls[0] in chips_list_org and rolls[1] in chips_list_org:
                         possible_moves_tmp.append(rolls)
+                    elif rolls[0] in chips_list_org:
+                        possible_moves_tmp.append([rolls[0]])
+                    elif rolls[1] in chips_list_org:
+                        possible_moves_tmp.append([rolls[1]])
                     else:
                         continue
             go = False
@@ -258,7 +291,7 @@ def play(ITERATIONS, PRINT_STATS=False):
                 chips_list = chips_list_now.copy()
                 
                 result, total_fails, total_ends = run(chips_list, 
-                            player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
+                        player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE)
                 
                 result_list[result] += 1
                 other_info[0] += total_fails
@@ -315,7 +348,7 @@ def play(ITERATIONS, PRINT_STATS=False):
             chips_list = set()
 
             result, total_fails, total_ends = run(chips_list, 
-                            player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
+                        player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE)
             
             result_list[result] += 1
 
@@ -344,7 +377,7 @@ def play(ITERATIONS, PRINT_STATS=False):
             chips_list = chips_list_org.copy()
 
             result, total_fails, total_ends = run(chips_list, 
-                        player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, PLAYER_MOVE)
+                        player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE)
             
             result_list[result] += 1
 

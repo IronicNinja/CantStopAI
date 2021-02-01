@@ -105,6 +105,7 @@ def continue_turn(RANDOM=True, RIG=0.5):
         else:
             return False
 
+fails = [0]
 def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE):
     """
     Driver Monte Carlo Simulation
@@ -126,6 +127,7 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
                 hypo_A = player_A.copy()
                 if total_fails == 1 and total_ends == 0:
                     player_A_score = A_score_org
+                    fails[0] += 1
             else:
                 hypo_B = player_B.copy()
                 if total_fails == 1 and total_ends == 0:
@@ -369,6 +371,8 @@ def play(ITERATIONS, th=0.9, PRINT_STATS=False, RIG_TYPE="EXP"):
 
         result_list = [0, 0]
 
+        fails[0] = 0
+        print(fails[0])
         for j in range(ITERATIONS):
             # continue
             player_A = player_A_org.copy()
@@ -388,6 +392,8 @@ def play(ITERATIONS, th=0.9, PRINT_STATS=False, RIG_TYPE="EXP"):
                         player_A, player_B, hypo_A, hypo_B, player_A_score, player_B_score, A_score_org, B_score_org, completed, hypo_completed, board_end, RIG_TYPE, PLAYER_MOVE)
             
             result_list[result] += 1
+
+        print(fails)
         
         if PLAYER_MOVE_org:
             win_percentage_cont.append(result_list[1])

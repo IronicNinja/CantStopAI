@@ -76,7 +76,7 @@ def player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MO
             rolls_list.append(rolls)
 
     if not rolls_list:
-        return chips_list, hypo_completed, True
+        return chips_list, hypo_A, hypo_B, hypo_completed, True
 
     if RANDOM:
         index = random.randint(0, len(rolls_list)-1)
@@ -91,7 +91,7 @@ def player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MO
                     hypo_completed.add(roll)
             chips_list.add(roll)
 
-        return chips_list, hypo_completed, False
+        return chips_list, hypo_A, hypo_B, hypo_completed, False
             
 def continue_turn(RANDOM=True, RIG=0.5):
     """
@@ -118,7 +118,7 @@ def run(chips_list, player_A, player_B, hypo_A, hypo_B, player_A_score, player_B
     c = 0
 
     while True:
-        chips_list, hypo_completed, failed = player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MOVE)
+        chips_list, hypo_A, hypo_B, hypo_completed, failed = player_move(chips_list, hypo_A, hypo_B, hypo_completed, board_end, PLAYER_MOVE)
         if failed:
             total_fails += 1
             # Reset all parameters
